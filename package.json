@@ -1,0 +1,29 @@
+{
+    "name": "1001tracklists-scraper",
+    "version": "1.0.0",
+    "description": "Scraper for fetching content from 1001tracklists.com",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/GodLesZ/1001tracklists-scraper.git"
+    },
+    "keywords": [
+        "1001tracklists.com"
+    ],
+    "author": "GodLesZ",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/GodLesZ/1001tracklists-scraper/issues"
+    },
+    "homepage": "https://github.com/GodLesZ/1001tracklists-scraper#readme",
+    "dependencies": {
+        "request": "latest",
+        "cheerio": "latest",
+        "yargs": "latest",
+        "sync-request": "latest",
+        "querystring": "latest"
+    }
+}
