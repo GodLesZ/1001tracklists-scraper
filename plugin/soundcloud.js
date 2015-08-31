@@ -1,67 +1,139 @@
 "use strict";
 
+var fs                = require('fs');
+var path              = require('path');
+var request           = require('request');
+var seqQueue          = require('seq-queue');
+var sanitize          = require("sanitize-filename");
+var ffmetadata        = require("ffmetadata"),
+    ffmetadataOptions = {};
+
+var queue = seqQueue.createQueue(1000);
+queue.on('drained', function () {
+    console.log('All downloads completed');
+});
+
 module.exports = {
-    consume: function(tracks) {
+    consume: function (tracks, downloadDestination, pluginOtions) {
         console.log('Soundcloud plugin got tracklist');
 
-        // @TODO: Investigate and provide auto-download
+        pluginOtions.filename = pluginOtions.filename || '##title';
+
         // @TODO: Take care for rtmp streams
-        /*
-        if (soundcloud.downloadable) {
-            <permalink>/download?client_id=YOUR_CLIENT_ID
-        } else {
-            https://api.soundcloud.com/tracks/<id>/stream?client_id=YOUR_CLIENT_ID
+
+        var queuedFiles = [];
+        for (var i in tracks) {
+            if (tracks.hasOwnProperty(i) === false) {
+                continue;
+            }
+
+            var track       = tracks[i],
+                scDataArray = track.mediaData.soundcloud,
+                logTag      = '[' + track.number + '] ' + track.title + ': ',
+                downloadUri = null;
+
+            if (!scDataArray || scDataArray.length === 0) {
+                console.log(logTag + 'No soundcloud data');
+                continue;
+            }
+
+            for (var sc = 0; sc < scDataArray.length; sc++) {
+                var scData         = scDataArray[sc],
+                    targetFilename = pluginOtions.filename + '.mp3';
+
+                for (var scDataKey in scData) {
+                    if (scData.hasOwnProperty(scDataKey) === false) {
+                        continue;
+                    }
+
+                    targetFilename = targetFilename.replace('##' + scDataKey, scData[scDataKey]);
+                }
+
+                var targetFilepath = path.normalize(downloadDestination + '/' + sanitize(targetFilename));
+
+                if (scData.downloadable) {
+                    downloadUri = scData.permalink_url + '/download?client_id=YOUR_CLIENT_ID';
+                }
+                else {
+                    downloadUri = 'https://api.soundcloud.com/tracks/' + scData.id + '/stream?client_id=YOUR_CLIENT_ID';
+                }
+
+                if (queuedFiles.indexOf(targetFilepath) !== -1) {
+                    continue;
+                }
+
+                queuedFiles.push(targetFilename);
+
+                console.log('[Download]', track.number, ':', scData.title, '(#' + scData.id + ')');
+
+                queue.push(function (url, targetFilepath, scData, trackData) {
+                    return function (task) {
+
+                        var writeStream = fs.createWriteStream(targetFilepath);
+                        writeStream.on('finish', function () {
+                            // @TODO: Currently ffmedata process closed w/ code -4058; don't know why
+                            task.done();
+                            /*
+                             var data = {
+                             TBPM:      scData.bpm || 0,
+                             TIT3:      '"'+(scData.description || '')+'"',
+                             genre:     scData.genre || '',
+                             title:     '"'+(scData.title || '')+'"',
+                             copyright: scData.permalink_url || '',
+                             date:      scData.release_year || 0,
+                             artist:    '"'+(scData.user ? scData.user.username : '')+'"'
+                             };
+                             ffmetadata.write(targetFilepath, data, ffmetadataOptions, function () {
+                             task.done();
+                             });
+                             */
+                        });
+
+                        request
+                            .get(url)
+                            .on('error', function (err) {
+                                console.error('[Request] Error during request:', err);
+                                task.done();
+                            })
+                            .pipe(writeStream);
+                    };
+                }(downloadUri, targetFilepath, scData, track));
+            }
         }
 
-     {
-         publisher_metadata: null,
-         user: [Object],
-         user_id: 296190,
-         genre: 'progressive house',
-         tag_list: 'hardwell makj countdown original mix download',
-         duration: 123518,
-         downloadable: false,
-         streamable: true,
-         original_content_size: 1977838,
-         commentable: true,
-         sharing: 'public',
-         public: true,
-         created_at: '2013/10/07 10:04:13 +0000',
-         updated_at: '2015/08/17 17:56:10 +0000',
-         isrc: '',
-         state: 'finished',
-         embeddable: true,
-         embeddable_by: 'all',
-         license: 'all-rights-reserved',
-         waveform_url: 'https://w1.sndcdn.com/VVgJKaBf6bVq_m.png',
-         feedable: false,
-         label_name: 'Revealed Recordings',
-         release_date: '2013-10-07',
-         has_downloads_left: true,
-         purchase_title: null,
-         purchase_url: 'http://bit.ly/CountdownBP',
-         policy: 'ALLOW',
-         monetization_model: 'NOT_APPLICABLE',
-         visuals: null,
-         permalink: 'hardwell-makj-countdown-original-mix-download',
-         title: 'Hardwell & MAKJ - Countdown - OUT NOW!',
-         description: 'Show some love and vote for Hardwell → http://www.djhardwell.com/vote\n\nHardwell presents Revealed Vol. 6 → http://hwl.dj/REVRVol6\nHardwell - United We Are (Album) → http://bit.ly/UNITEDWEARE\n\nHardwell & MAKJ - Countdown (Original Mix)\nDownload on iTunes: http://bit.ly/CountdownItunes\nBeatport:  http://bit.ly/CountdownBP\nStream on Spotify: http://spoti.fi/1a4WKKZ\n\nAfter releasing his firing edit of Blasterjaxx\'s "Fifteen," he quickly turns around an exhilarating new original in collaboration with the Los Angeles-based rising star, MAKJ. Ever since "Countdown" was dropped during his acclaimed set at Ultra Music Festival 2013, Hardwell has established the song as a peak-time secret weapon in his performances all summer, thus becoming one of his most highly anticipated tracks.\n\nHardwell brings on the burgeoning talent, MAKJ, to foster an explosive new sound that has been tested and proven throughout this year. The fact that "Countdown" has been one of the most buzzed about tracks for months is a testament to Hardwell\'s signature, festival anthem sound has been manifested at its fundamental core time and time again.\n\nCheck out the trailer for "I AM HARDWELL - The Documentary" and subscribe here: http://www.djhardwell.com/docu/\n\nFor more info:\nhttp://www.djhardwell.com\nhttp://www.twitter.com/hardwell\nhttp://www.facebook.com/djhardwell\nhttp://www.soundcloud.com/hardwell\nhttp://www.instagram.com/hardwell\n\nhttp://www.DJMAKJ.com\nhttp://www.twitter.com/DJMAKJ\nhttp://www.facebook.com/MAKJOfficial\nhttp://www.soundcloud.com/djmakj\nhttp://instagram.com/djmakj\n\nhttp://www.revealedrecordings.com\nhttp://facebook.com/revealedrecordings\nhttp://twitter.com/revealedrec',
-         track_type: 'original',
-         last_modified: '2015/08/17 17:56:10 +0000',
-         artwork_url: 'https://i1.sndcdn.com/artworks-000059523832-do5lay-large.jpg',
-         id: 114203961,
-         kind: 'track',
-         stream_url: 'https://api.soundcloud.com/tracks/114203961/stream',
-         secret_token: null,
-         reposts_count: 25773,
-         permalink_url: 'https://soundcloud.com/hardwell/hardwell-makj-countdown-original-mix-download',
-         likes_count: 95679,
-         download_count: 1,
-         playback_count: 5459232,
-         comment_count: 4458,
-         uri: 'https://api.soundcloud.com/tracks/114203961',
-         download_url: null
-     }
+        queue.close();
+
+        // @TODO: Taglib pics
+        /*
+
+         try
+         {
+         byte[] array = new byte[0];
+         WebRequest webRequest = WebRequest.Create(trackInfo.artwork_url.ToString().Replace("-large.", "-t500x500."));
+         Stream stream = webRequest.GetResponse().GetResponseStream();
+         byte[] numArray1 = new byte[1024];
+         MemoryStream memoryStream = new MemoryStream();
+         int num4 = 0;
+         do
+         {
+         num4 = stream.Read(numArray1, 0, (int)numArray1.Length);
+         memoryStream.Write(numArray1, 0, num4);
+         }
+         while (num4 != 0);
+         array = memoryStream.ToArray();
+         stream.Close();
+         memoryStream.Close();
+         IPicture[] pictureArray = new IPicture[1];
+         byte[] numArray2 = array;
+         ByteVector byteVectors = new ByteVector(numArray2, (int)numArray2.Length);
+         AttachedPictureFrame attachedPictureFrame = new AttachedPictureFrame(new Picture(byteVectors))
+         {
+         MimeType = "image/jpeg",
+         Type = PictureType.FrontCover
+         };
+         pictureArray[0] = attachedPictureFrame;
+         tag.Pictures = pictureArray;
+         }
          */
     }
 };
