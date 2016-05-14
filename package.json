@@ -23,6 +23,8 @@
   "dependencies": {
     "cheerio": "latest",
     "ffmetadata": "^1.3.0",
+    "jquery": "^2.2.3",
+    "jsdom": "^9.0.0",
     "node-status": "^0.1.4",
     "querystring": "latest",
     "request": "latest",

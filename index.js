@@ -8,11 +8,18 @@ var path    = require('path');
 var scraper = require('./lib/scraper');
 
 var argv = require('yargs')
-    .usage('Usage: $0 --id [num] --plugin [string]')
+    .usage('Usage: $0 --id [num] --type [type_to_fetch] --plugin [dir]')
     .option('id', {
         alias:    'i',
         demand:   true,
         describe: '1001tracklists id'
+    })
+    .option('type', {
+        alias:    't',
+        demand:   true,
+        default:  'tracklist',
+        choices:  ['tracklist', 'artist'],
+        describe: '1001tracklists type to fetch'
     })
     .option('plugin', {
         alias:    'p',
@@ -28,23 +35,24 @@ var argv = require('yargs')
     })
     .argv;
 
-var tracklistId             = argv.id,
-    tracklistConsumer       = argv.plugin,
-    tracklistConsumerArgKey = tracklistConsumer + '-',
-    tracklistConsumerArgs   = {},
-    downloadDestination     = argv.dir,
-    pluginPath              = './plugin/' + tracklistConsumer,
-    shortUrl                = 'http://1001.tl/' + tracklistId;
+var fetchId             = argv.id,
+    fetchType           = argv.type,
+    plugin              = argv.plugin,
+    pluginArgKey        = plugin + '-',
+    pluginArgs          = {},
+    pluginPath          = './plugin/' + plugin,
+    downloadDestination = argv.dir,
+    shortUrl            = 'http://1001.tl/' + fetchType + '/' + fetchId;
 
 for (var argKey in argv) {
-    if (argv.hasOwnProperty(argKey) === false || argKey.indexOf(tracklistConsumerArgKey) !== 0) {
+    if (argv.hasOwnProperty(argKey) === false || argKey.indexOf(pluginArgKey) !== 0) {
         continue;
     }
 
-    tracklistConsumerArgs[argKey] = argv[argKey];
+    pluginArgs[argKey] = argv[argKey];
 }
 
-downloadDestination = downloadDestination.replace(/#tracklistId/gi, tracklistId);
+downloadDestination = downloadDestination.replace(/#id/gi, fetchId);
 if (path.isAbsolute(downloadDestination) === false) {
     downloadDestination = path.normalize(__dirname + '/' + downloadDestination);
 }
@@ -59,9 +67,9 @@ scraper.scrape(shortUrl, function (err, tracks, tracklistName) {
         console.error(err);
     }
 
-    console.log('Got tracklist w/ ' + tracks.length + ' tracks from:', tracklistName);
-    console.log('Loading "' + tracklistConsumer + '" plugin..');
+    console.log('Got ' + tracks.length + ' tracks from:', tracklistName);
+    console.log('Loading "' + pluginPath + '" ..');
 
     var plugin = require(pluginPath);
-    plugin.consume(tracks, downloadDestination, tracklistConsumerArgs);
+    plugin.consume(tracks, downloadDestination, pluginArgs);
 });

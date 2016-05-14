@@ -52,10 +52,10 @@ module.exports = {
                 var targetFilepath = path.normalize(downloadDestination + '/' + sanitize(targetFilename));
 
                 if (scData.downloadable) {
-                    downloadUri = scData.permalink_url + '/download?client_id=YOUR_CLIENT_ID';
+                    downloadUri = scData.permalink_url + '/download?client_id=02gUJC0hH2ct1EGOcYXQIzRFU91c72Ea';
                 }
                 else {
-                    downloadUri = 'https://api.soundcloud.com/tracks/' + scData.id + '/stream?client_id=YOUR_CLIENT_ID';
+                    downloadUri = 'https://api.soundcloud.com/tracks/' + scData.id + '/stream?client_id=02gUJC0hH2ct1EGOcYXQIzRFU91c72Ea';
                 }
 
                 if (queuedFiles.indexOf(targetFilepath) !== -1) {
